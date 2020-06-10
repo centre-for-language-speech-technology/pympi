@@ -31,7 +31,7 @@ class Eaf:
         attributes, ordinal)}``,
 
         aligned_annotations of the form: ``[{id -> (begin_ts, end_ts, value,
-        svg_ref)}]``,
+        svg_ref, cve_ref)}]``,
 
         reference annotations of the form: ``[{id -> (reference, value,
         previous, svg_ref)}]``.
@@ -116,7 +116,7 @@ class Eaf:
         else:
             parse_eaf(file_path, self)
 
-    def add_annotation(self, id_tier, start, end, value='', svg_ref=None):
+    def add_annotation(self, id_tier, start, end, value='', svg_ref=None, cve_ref=None):
         """Add an annotation.
 
         :param str id_tier: Name of the tier.
@@ -141,7 +141,7 @@ class Eaf:
         end_ts = self.generate_ts_id(end)
         aid = self.generate_annotation_id()
         self.annotations[aid] = id_tier
-        self.tiers[id_tier][0][aid] = (start_ts, end_ts, value, svg_ref)
+        self.tiers[id_tier][0][aid] = (start_ts, end_ts, value, svg_ref, cve_ref)
 
     def add_controlled_vocabulary(self, cv_id, ext_ref=None):
         """Add a controlled vocabulary. This will initialize the controlled
@@ -325,7 +325,7 @@ class Eaf:
         if self.tiers[id_tier][0]:
             raise ValueError('This tier already contains normal annotations.')
         ann = None
-        for aid, (begin, end, _, _) in self.tiers[tier2][0].items():
+        for aid, (begin, end, _, _, _) in self.tiers[tier2][0].items():
             begin = self.timeslots[begin]
             end = self.timeslots[end]
             if begin <= time and end >= time:
@@ -622,7 +622,7 @@ class Eaf:
         if self.tiers[id_tier][1]:
             return self.get_ref_annotation_data_between_times(
                 id_tier, start, end)
-        anns = ((self.timeslots[a[0]], self.timeslots[a[1]], a[2])
+        anns = ((self.timeslots[a[0]], self.timeslots[a[1]], a[2], a[3])
                 for a in self.tiers[id_tier][0].values())
         return sorted(a for a in anns if a[1] >= start and a[0] <= end)
 
@@ -637,7 +637,7 @@ class Eaf:
         if self.tiers[id_tier][1]:
             return self.get_ref_annotation_data_for_tier(id_tier)
         a = self.tiers[id_tier][0]
-        return [(self.timeslots[a[b][0]], self.timeslots[a[b][1]], a[b][2])
+        return [(self.timeslots[a[b][0]], self.timeslots[a[b][1]], a[b][2], a[b][3])
                 for b in a]
 
     def get_child_tiers_for(self, id_tier):
@@ -1507,10 +1507,12 @@ def parse_eaf(file_path, eaf_obj):
                             annot_start = elem2.attrib['TIME_SLOT_REF1']
                             annot_end = elem2.attrib['TIME_SLOT_REF2']
                             svg_ref = elem2.attrib.get('SVG_REF', None)
+                            cve_ref = elem2.attrib.get('CVE_REF', None)
                             align[annot_id] = (annot_start, annot_end,
                                                '' if not list(elem2)[0].text
                                                else list(elem2)[0].text,
-                                               svg_ref)
+                                               svg_ref,
+                                               cve_ref)
                             eaf_obj.annotations[annot_id] = tier_id
                         elif elem2.tag == 'REF_ANNOTATION':
                             annot_ref = elem2.attrib['ANNOTATION_REF']
@@ -1656,7 +1658,8 @@ def to_eaf(file_path, eaf_obj, pretty=True):
             ann = etree.SubElement(tier, 'ANNOTATION')
             alan = etree.SubElement(ann, 'ALIGNABLE_ANNOTATION', rm_none(
                 {'ANNOTATION_ID': a[0], 'TIME_SLOT_REF1': a[1][0],
-                 'TIME_SLOT_REF2': a[1][1], 'SVG_REF': a[1][3]}))
+                 'TIME_SLOT_REF2': a[1][1], 'SVG_REF': a[1][3],
+                 'CVE_REF': a[1][4]}))
             etree.SubElement(alan, 'ANNOTATION_VALUE').text = a[1][2]
         for a in t[1][1].items():
             ann = etree.SubElement(tier, 'ANNOTATION')
